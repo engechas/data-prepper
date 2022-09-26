@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.lang.String.format;
 
@@ -29,10 +28,9 @@ public final class PipelineConnector<T extends Record<?>> implements Source<T>, 
     private String sourcePipelineName; //name of the pipeline for which this connector acts as source
     private String sinkPipelineName; //name of the pipeline for which this connector acts as sink
     private Buffer<T> buffer;
-    private AtomicBoolean isStopRequested;
 
     public PipelineConnector() {
-        isStopRequested = new AtomicBoolean(false);
+
     }
 
     public PipelineConnector(final String sinkPipelineName) {
@@ -47,12 +45,12 @@ public final class PipelineConnector<T extends Record<?>> implements Source<T>, 
 
     @Override
     public void stop() {
-        isStopRequested.set(true);
+
     }
 
     @Override
     public void output(final Collection<T> records) {
-        if (buffer != null && !isStopRequested.get()) {
+        if (buffer != null) {
             for (T record : records) {
                 while (true) {
                     try {

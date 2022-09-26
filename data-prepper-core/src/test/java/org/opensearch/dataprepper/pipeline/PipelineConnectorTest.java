@@ -50,14 +50,6 @@ public class PipelineConnectorTest {
         sut.output(recordList);
     }
 
-    @Test(expected = RuntimeException.class)
-    public void testOutputAfterBufferStopRequested() {
-        sut.start(buffer);
-        sut.stop();
-
-        sut.output(recordList);
-    }
-
     @Test
     public void testOutputBufferTimesOutThenSucceeds() throws Exception {
         doThrow(new TimeoutException()).doNothing().when(buffer).write(any(), anyInt());
