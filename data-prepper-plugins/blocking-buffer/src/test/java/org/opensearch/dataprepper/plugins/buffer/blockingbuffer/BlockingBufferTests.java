@@ -50,6 +50,7 @@ public class BlockingBufferTests {
     private static final String TEST_PIPELINE_NAME = "test-pipeline";
     private static final String PLUGIN_NAME = "BlockingBuffer";
     private static final int TEST_BATCH_SIZE = 3;
+    private static final int TEST_BATCH_MAX_BYTE_SIZE = 10000;
     private static final int TEST_BUFFER_SIZE = 13;
     private static final int TEST_WRITE_TIMEOUT = 1_00;
     private static final int TEST_BATCH_READ_TIMEOUT = 5_000;
@@ -87,14 +88,14 @@ public class BlockingBufferTests {
 
     @Test
     public void testCreationUsingValues() {
-        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(TEST_BUFFER_SIZE, TEST_BATCH_SIZE,
+        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(TEST_BUFFER_SIZE, TEST_BATCH_SIZE, TEST_BATCH_MAX_BYTE_SIZE,
                 TEST_PIPELINE_NAME);
         assertThat(blockingBuffer, notNullValue());
     }
 
     @Test
     public void testInsertNull() throws TimeoutException {
-        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(TEST_BUFFER_SIZE, TEST_BATCH_SIZE,
+        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(TEST_BUFFER_SIZE, TEST_BATCH_SIZE, TEST_BATCH_MAX_BYTE_SIZE,
                 TEST_PIPELINE_NAME);
         assertThat(blockingBuffer, notNullValue());
         assertThrows(NullPointerException.class, () -> blockingBuffer.write(null, TEST_WRITE_TIMEOUT));
@@ -102,7 +103,7 @@ public class BlockingBufferTests {
 
     @Test
     public void testWriteAllSizeOverflow() {
-        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(TEST_BUFFER_SIZE, TEST_BATCH_SIZE,
+        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(TEST_BUFFER_SIZE, TEST_BATCH_SIZE, TEST_BATCH_MAX_BYTE_SIZE,
                 TEST_PIPELINE_NAME);
         assertThat(blockingBuffer, notNullValue());
         final Collection<Record<String>> testRecords = generateBatchRecords(TEST_BUFFER_SIZE + 1);
@@ -112,7 +113,7 @@ public class BlockingBufferTests {
 
     @Test
     public void testNoEmptySpaceWriteOnly() throws TimeoutException {
-        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(1, TEST_BATCH_SIZE,
+        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(1, TEST_BATCH_SIZE, TEST_BATCH_MAX_BYTE_SIZE,
                 TEST_PIPELINE_NAME);
         assertThat(blockingBuffer, notNullValue());
         blockingBuffer.write(new Record<>("FILL_THE_BUFFER"), TEST_WRITE_TIMEOUT);
@@ -121,7 +122,7 @@ public class BlockingBufferTests {
 
     @Test
     public void testNoAvailSpaceWriteAllOnly() throws Exception {
-        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(2, TEST_BATCH_SIZE,
+        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(2, TEST_BATCH_SIZE, TEST_BATCH_MAX_BYTE_SIZE,
                 TEST_PIPELINE_NAME);
         assertThat(blockingBuffer, notNullValue());
         final Collection<Record<String>> testRecords = generateBatchRecords(2);
@@ -132,7 +133,7 @@ public class BlockingBufferTests {
     @Test
     public void testNoEmptySpaceAfterUncheckedRead() throws TimeoutException {
         // Given
-        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(1, TEST_BATCH_SIZE,
+        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(1, TEST_BATCH_SIZE, TEST_BATCH_MAX_BYTE_SIZE,
                 TEST_PIPELINE_NAME);
         blockingBuffer.write(new Record<>("FILL_THE_BUFFER"), TEST_WRITE_TIMEOUT);
 
@@ -149,7 +150,7 @@ public class BlockingBufferTests {
     @Test
     public void testWriteIntoEmptySpaceAfterCheckedRead() throws TimeoutException {
         // Given
-        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(1, TEST_BATCH_SIZE,
+        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(1, TEST_BATCH_SIZE, TEST_BATCH_MAX_BYTE_SIZE,
                 TEST_PIPELINE_NAME);
         assertThat(blockingBuffer, notNullValue());
         blockingBuffer.write(new Record<>("FILL_THE_BUFFER"), TEST_WRITE_TIMEOUT);
@@ -167,7 +168,7 @@ public class BlockingBufferTests {
     @Test
     public void testWriteAllIntoEmptySpaceAfterCheckedRead() throws Exception {
         // Given
-        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(2, TEST_BATCH_SIZE,
+        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(2, TEST_BATCH_SIZE, TEST_BATCH_MAX_BYTE_SIZE,
                 TEST_PIPELINE_NAME);
         assertThat(blockingBuffer, notNullValue());
         final Collection<Record<String>> testRecords = generateBatchRecords(2);
@@ -187,7 +188,7 @@ public class BlockingBufferTests {
 
     @Test
     public void testReadEmptyBuffer() {
-        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(TEST_BUFFER_SIZE, TEST_BATCH_SIZE,
+        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(TEST_BUFFER_SIZE, TEST_BATCH_SIZE, TEST_BATCH_MAX_BYTE_SIZE,
                 TEST_PIPELINE_NAME);
         assertThat(blockingBuffer, notNullValue());
         final Map.Entry<Collection<Record<String>>, CheckpointState> readResult = blockingBuffer.read(TEST_BATCH_READ_TIMEOUT);
@@ -307,7 +308,7 @@ public class BlockingBufferTests {
     @ArgumentsSource(BufferValuesArgumentProvider.class)
     public void testBufferUsage(final int recordsInBuffer, final int bufferSize, final double expectedValue) throws Exception {
 
-        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(bufferSize, TEST_BATCH_SIZE,
+        final BlockingBuffer<Record<String>> blockingBuffer = new BlockingBuffer<>(bufferSize, TEST_BATCH_SIZE, TEST_BATCH_MAX_BYTE_SIZE,
                 TEST_PIPELINE_NAME);
 
         final Collection<Record<String>> testRecords = generateBatchRecords(recordsInBuffer);

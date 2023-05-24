@@ -46,14 +46,16 @@ public class BlockingBuffer<T extends Record<?>> extends AbstractBuffer<T> {
     private static final Logger LOG = LoggerFactory.getLogger(BlockingBuffer.class);
     private static final int DEFAULT_BUFFER_CAPACITY = 12_800;
     private static final int DEFAULT_BATCH_SIZE = 200;
-    private static final int MAX_BATCH_SIZE_IN_BYTES = 50 * 1024 * 1024;
+    private static final int DEFAULT_BATCH_MAX_BYTE_SIZE = 50 * 1024 * 1024;
     private static final String PLUGIN_NAME = "bounded_blocking";
     private static final String ATTRIBUTE_BUFFER_CAPACITY = "buffer_size";
     private static final String ATTRIBUTE_BATCH_SIZE = "batch_size";
+    private static final String ATTRIBUTE_BATCH_MAX_BYTE_SIZE = "batch_max_byte_size";
     private static final String BLOCKING_BUFFER = "BlockingBuffer";
     private static final String BUFFER_USAGE_METRIC = "bufferUsage";
     private final int bufferCapacity;
     private final int batchSize;
+    private final int batchMaxByteSize;
     private final AtomicDouble bufferUsage;
     private final BlockingQueue<T> blockingQueue;
     private final String pipelineName;
@@ -68,11 +70,12 @@ public class BlockingBuffer<T extends Record<?>> extends AbstractBuffer<T> {
      * @param batchSize      the batch size for {@link #read(int)}
      * @param pipelineName   the name of the associated Pipeline
      */
-    public BlockingBuffer(final int bufferCapacity, final int batchSize, final String pipelineName) {
+    public BlockingBuffer(final int bufferCapacity, final int batchSize, final int batchMaxByteSize, final String pipelineName) {
         super(BLOCKING_BUFFER, pipelineName);
         bufferUsage = pluginMetrics.gauge(BUFFER_USAGE_METRIC, new AtomicDouble());
         this.bufferCapacity = bufferCapacity;
         this.batchSize = batchSize;
+        this.batchMaxByteSize = batchMaxByteSize;
         this.blockingQueue = new LinkedBlockingQueue<>(bufferCapacity);
         this.capacitySemaphore = new Semaphore(bufferCapacity);
         this.pipelineName = pipelineName;
@@ -91,11 +94,12 @@ public class BlockingBuffer<T extends Record<?>> extends AbstractBuffer<T> {
         this(checkNotNull(pluginSetting, "PluginSetting cannot be null")
                         .getIntegerOrDefault(ATTRIBUTE_BUFFER_CAPACITY, DEFAULT_BUFFER_CAPACITY),
                 pluginSetting.getIntegerOrDefault(ATTRIBUTE_BATCH_SIZE, DEFAULT_BATCH_SIZE),
+                pluginSetting.getIntegerOrDefault(ATTRIBUTE_BATCH_MAX_BYTE_SIZE, DEFAULT_BATCH_MAX_BYTE_SIZE),
                 pluginSetting.getPipelineName());
     }
 
     public BlockingBuffer(final String pipelineName) {
-        this(DEFAULT_BUFFER_CAPACITY, DEFAULT_BATCH_SIZE, pipelineName);
+        this(DEFAULT_BUFFER_CAPACITY, DEFAULT_BATCH_SIZE, DEFAULT_BATCH_MAX_BYTE_SIZE, pipelineName);
     }
 
     @Override
@@ -184,12 +188,12 @@ public class BlockingBuffer<T extends Record<?>> extends AbstractBuffer<T> {
         int recordsActuallyRead = 1;
 
         int recordsRead = 1;
-        while (recordsRead < (batchSize - 1) && approximateTotalSize < MAX_BATCH_SIZE_IN_BYTES && 0 < recordsActuallyRead) {
+        while (recordsRead < (batchSize - 1) && approximateTotalSize < batchMaxByteSize && 0 < recordsActuallyRead) {
             final double averageRecordSize = sampledRecordSizes.stream().mapToLong(x -> x).average().orElseThrow();
             LOG.warn("Found average record size for batch: {}", averageRecordSize);
 
             final int recordsToReadBasedOnCount = batchSize - recordsRead;
-            final int recordsToReadBasedOnSize = (int) ((MAX_BATCH_SIZE_IN_BYTES - (recordsRead * averageRecordSize)) / averageRecordSize);
+            final int recordsToReadBasedOnSize = (int) ((batchMaxByteSize - (recordsRead * averageRecordSize)) / averageRecordSize);
             final int maxRecordReadCount = 100;
 
             final int recordsToRead = Math.min(Math.min(recordsToReadBasedOnCount, recordsToReadBasedOnSize), maxRecordReadCount);
