@@ -16,6 +16,7 @@ import com.google.common.base.Stopwatch;
 import com.google.common.util.concurrent.AtomicDouble;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.ehcache.sizeof.SizeOf;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ public class BlockingBuffer<T extends Record<?>> extends AbstractBuffer<T> {
     private static final Logger LOG = LoggerFactory.getLogger(BlockingBuffer.class);
     private static final int DEFAULT_BUFFER_CAPACITY = 12_800;
     private static final int DEFAULT_BATCH_SIZE = 200;
+    private static final int MAX_BATCH_SIZE_IN_BYTES = 50 * 1024 * 1024;
     private static final String PLUGIN_NAME = "bounded_blocking";
     private static final String ATTRIBUTE_BUFFER_CAPACITY = "buffer_size";
     private static final String ATTRIBUTE_BATCH_SIZE = "batch_size";
@@ -57,6 +59,7 @@ public class BlockingBuffer<T extends Record<?>> extends AbstractBuffer<T> {
     private final String pipelineName;
 
     private final Semaphore capacitySemaphore;
+    private final SizeOf sizeOf = SizeOf.newInstance();
 
     /**
      * Creates a BlockingBuffer with the given (fixed) capacity.
@@ -153,10 +156,8 @@ public class BlockingBuffer<T extends Record<?>> extends AbstractBuffer<T> {
             final T record = pollForBufferEntry(5, TimeUnit.MILLISECONDS);
             if (record != null) { //record can be null, avoiding adding nulls
                 records.add(record);
-                recordsRead++;
+                recordsRead = readFromBuffer(records, sizeOf.deepSizeOf(record));
             }
-
-            recordsRead += blockingQueue.drainTo(records, batchSize - 1);
         } else {
             final Stopwatch stopwatch = Stopwatch.createStarted();
             while (stopwatch.elapsed(TimeUnit.MILLISECONDS) < timeoutInMillis && records.size() < batchSize) {
@@ -174,6 +175,32 @@ public class BlockingBuffer<T extends Record<?>> extends AbstractBuffer<T> {
 
         final CheckpointState checkpointState = new CheckpointState(recordsRead);
         return new AbstractMap.SimpleEntry<>(records, checkpointState);
+    }
+
+    private int readFromBuffer(final List<T> records, final long sampleRecordSize) {
+        final List<Long> sampledRecordSizes = new ArrayList<>();
+        sampledRecordSizes.add(sampleRecordSize);
+        long approximateTotalSize = sampleRecordSize;
+        int recordsActuallyRead = 1;
+
+        int recordsRead = 1;
+        while (recordsRead < (batchSize - 1) && approximateTotalSize < MAX_BATCH_SIZE_IN_BYTES && 0 < recordsActuallyRead) {
+            final double averageRecordSize = sampledRecordSizes.stream().mapToLong(x -> x).average().orElseThrow();
+            LOG.warn("Found average record size for batch: {}", averageRecordSize);
+
+            final int recordsToReadBasedOnCount = batchSize - recordsRead;
+            final int recordsToReadBasedOnSize = (int) ((MAX_BATCH_SIZE_IN_BYTES - (recordsRead * averageRecordSize)) / averageRecordSize);
+            final int maxRecordReadCount = 100;
+
+            final int recordsToRead = Math.min(Math.min(recordsToReadBasedOnCount, recordsToReadBasedOnSize), maxRecordReadCount);
+            recordsActuallyRead = blockingQueue.drainTo(records, recordsToRead);
+            recordsRead += recordsActuallyRead;
+            approximateTotalSize = (long) (averageRecordSize * recordsRead);
+            sampledRecordSizes.add(sizeOf.deepSizeOf(records.get(records.size() - 1)));
+            LOG.warn("Records read {}, approx size {}", recordsRead, approximateTotalSize);
+        }
+
+        return recordsRead;
     }
 
     private T pollForBufferEntry(final int timeoutValue, final TimeUnit timeoutUnit) {

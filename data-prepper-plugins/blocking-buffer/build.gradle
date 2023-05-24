@@ -8,6 +8,7 @@ plugins {
 }
 dependencies {
     implementation project(':data-prepper-api')
+    implementation 'org.ehcache:sizeof:0.4.3'
     testImplementation 'io.micrometer:micrometer-core'
 }
 
