@@ -83,7 +83,7 @@ public class CollapseMapProcessor extends AbstractProcessor<Record<Event>, Recor
             final String collapsedValue = getCollapsedValue(fullPath, recordEvent);
 
             if (Objects.isNull(collapsedValue)) {
-                LOG.warn("Did not find entries for one or more pointers specified by [{}] for an entry in the list of maps at [{}] on record [{}]",
+                LOG.warn(EVENT, "Did not find entries for one or more pointers specified by [{}] for an entry in the list of maps at [{}] on record [{}]",
                         config.getCollapsedValuePattern(), config.getSource(), recordEvent);
                 continue;
             }
@@ -99,7 +99,7 @@ public class CollapseMapProcessor extends AbstractProcessor<Record<Event>, Recor
         final String collapsedValue = getCollapsedValue(fullPath, recordEvent);
 
         if (Objects.isNull(collapsedValue)) {
-            LOG.warn("Did not find entries for one or more pointers specified by [{}] at [{}] on record [{}]",
+            LOG.warn(EVENT, "Did not find entries for one or more pointers specified by [{}] at [{}] on record [{}]",
                     config.getCollapsedValuePattern(), config.getSource(), recordEvent);
             return null;
         }
