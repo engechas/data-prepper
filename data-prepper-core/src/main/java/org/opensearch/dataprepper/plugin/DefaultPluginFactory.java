@@ -5,6 +5,7 @@
 
 package org.opensearch.dataprepper.plugin;
 
+import org.opensearch.dataprepper.feedback.Observer;
 import org.opensearch.dataprepper.model.sink.SinkContext;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
@@ -41,6 +42,7 @@ public class DefaultPluginFactory implements PluginFactory {
     private final PluginBeanFactoryProvider pluginBeanFactoryProvider;
     private final DefaultEventFactory eventFactory;
     private final DefaultAcknowledgementSetManager acknowledgementSetManager;
+    private final Observer observer;
 
     @Inject
     DefaultPluginFactory(
@@ -49,8 +51,9 @@ public class DefaultPluginFactory implements PluginFactory {
             final PluginConfigurationConverter pluginConfigurationConverter,
             final PluginBeanFactoryProvider pluginBeanFactoryProvider,
             final DefaultEventFactory eventFactory,
-            final DefaultAcknowledgementSetManager acknowledgementSetManager
-    ) {
+            final DefaultAcknowledgementSetManager acknowledgementSetManager,
+            final Observer observer
+            ) {
         Objects.requireNonNull(pluginProviderLoader);
         this.pluginCreator = Objects.requireNonNull(pluginCreator);
         this.pluginConfigurationConverter = Objects.requireNonNull(pluginConfigurationConverter);
@@ -59,6 +62,7 @@ public class DefaultPluginFactory implements PluginFactory {
         this.pluginBeanFactoryProvider = Objects.requireNonNull(pluginBeanFactoryProvider);
         this.eventFactory = Objects.requireNonNull(eventFactory);
         this.acknowledgementSetManager = Objects.requireNonNull(acknowledgementSetManager);
+        this.observer = Objects.requireNonNull(observer);
 
         if(pluginProviders.isEmpty()) {
             throw new RuntimeException("Data Prepper requires at least one PluginProvider. " +
@@ -123,6 +127,7 @@ public class DefaultPluginFactory implements PluginFactory {
                 .withEventFactory(eventFactory)
                 .withAcknowledgementSetManager(acknowledgementSetManager)
                 .withSinkContext(sinkContext)
+                .withObserver(observer)
                 .build();
     }
 

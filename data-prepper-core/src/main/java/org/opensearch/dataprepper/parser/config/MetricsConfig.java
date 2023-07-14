@@ -5,6 +5,7 @@
 
 package org.opensearch.dataprepper.parser.config;
 
+import org.opensearch.dataprepper.feedback.Observer;
 import org.opensearch.dataprepper.meter.EMFLoggingMeterRegistry;
 import org.opensearch.dataprepper.meter.JvmMemoryAggregateMetrics;
 import org.opensearch.dataprepper.parser.model.DataPrepperConfiguration;
@@ -103,10 +104,11 @@ public class MetricsConfig {
 
     @Bean
     public CloudWatchMeterRegistryProvider cloudWatchMeterRegistryProvider(
-            final DataPrepperConfiguration dataPrepperConfiguration
-    ) {
+            final DataPrepperConfiguration dataPrepperConfiguration,
+            final Observer observer
+            ) {
         if (dataPrepperConfiguration.getMetricRegistryTypes().contains(MetricRegistryType.CloudWatch)) {
-            return new CloudWatchMeterRegistryProvider();
+            return new CloudWatchMeterRegistryProvider(observer);
         }
         else {
             return null;

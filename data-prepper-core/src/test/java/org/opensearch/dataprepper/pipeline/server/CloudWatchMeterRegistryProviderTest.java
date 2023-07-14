@@ -24,13 +24,13 @@ public class CloudWatchMeterRegistryProviderTest {
 
     @Test(expected = NullPointerException.class)
     public void testCreateWithInvalidPropertiesFile() {
-        new CloudWatchMeterRegistryProvider("does not exist", cloudWatchAsyncClient);
+        new CloudWatchMeterRegistryProvider("does not exist", cloudWatchAsyncClient, null);
     }
 
     @Test
     public void testCreateCloudWatchMeterRegistry() {
         final CloudWatchMeterRegistryProvider cloudWatchMeterRegistryProvider = new CloudWatchMeterRegistryProvider(
-                TEST_CLOUDWATCH_PROPERTIES, cloudWatchAsyncClient);
+                TEST_CLOUDWATCH_PROPERTIES, cloudWatchAsyncClient, null);
         final CloudWatchMeterRegistry cloudWatchMeterRegistry = cloudWatchMeterRegistryProvider.getCloudWatchMeterRegistry();
         assertThat(cloudWatchMeterRegistry, notNullValue());
     }

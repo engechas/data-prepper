@@ -51,6 +51,7 @@ import org.opensearch.dataprepper.plugins.sink.opensearch.index.IndexManagerFact
 import org.opensearch.dataprepper.plugins.sink.opensearch.index.IndexType;
 import org.opensearch.dataprepper.plugins.sink.opensearch.index.TemplateStrategy;
 import org.slf4j.Logger;
+import org.opensearch.dataprepper.feedback.Observer;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedWriter;
@@ -89,7 +90,7 @@ public class OpenSearchSink extends AbstractSink<Record<Event>> {
   private IndexManager indexManager;
   private Supplier<AccumulatingBulkRequest> bulkRequestSupplier;
   private BulkRetryStrategy bulkRetryStrategy;
-  private final long bulkSize;
+  private long bulkSize;
   private final long flushTimeout;
   private final IndexType indexType;
   private final String documentIdField;
@@ -115,14 +116,18 @@ public class OpenSearchSink extends AbstractSink<Record<Event>> {
   private final ConcurrentHashMap<Long, AccumulatingBulkRequest<BulkOperationWrapper, BulkRequest>> bulkRequestMap;
   private final ConcurrentHashMap<Long, Long> lastFlushTimeMap;
 
+  private final Observer observer;
+
   @DataPrepperPluginConstructor
   public OpenSearchSink(final PluginSetting pluginSetting,
                         final PluginFactory pluginFactory,
                         final SinkContext sinkContext,
-                        final AwsCredentialsSupplier awsCredentialsSupplier) {
+                        final AwsCredentialsSupplier awsCredentialsSupplier,
+                        final Observer observer) {
     super(pluginSetting, Integer.MAX_VALUE, INITIALIZE_RETRY_WAIT_TIME_MS);
     this.awsCredentialsSupplier = awsCredentialsSupplier;
     this.sinkContext = sinkContext;
+    this.observer = observer;
     bulkRequestTimer = pluginMetrics.timer(BULKREQUEST_LATENCY);
     bulkRequestErrorsCounter = pluginMetrics.counter(BULKREQUEST_ERRORS);
     dynamicIndexDroppedEvents = pluginMetrics.counter(DYNAMIC_INDEX_DROPPED_EVENTS);
@@ -220,6 +225,7 @@ public class OpenSearchSink extends AbstractSink<Record<Event>> {
             pluginSetting);
 
     objectMapper = new ObjectMapper();
+    observer.registerCurrentConfigurationValue("s3-log-pipeline.opensearch.bulkRequestLatency", bulkSize);
     this.initialized = true;
     LOG.info("Initialized OpenSearch sink");
   }
@@ -231,6 +237,12 @@ public class OpenSearchSink extends AbstractSink<Record<Event>> {
 
   @Override
   public void doOutput(final Collection<Record<Event>> records) {
+    final long newBulkSize = observer.getConfigurationValue();
+    if (newBulkSize != bulkSize) {
+      bulkSize = newBulkSize;
+      LOG.warn("Got bulk size from observer: [{}]", bulkSize);
+    }
+
     final long threadId = Thread.currentThread().getId();
     if (!bulkRequestMap.containsKey(threadId)) {
       bulkRequestMap.put(threadId, bulkRequestSupplier.get());

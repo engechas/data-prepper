@@ -7,6 +7,7 @@ package org.opensearch.dataprepper.parser.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import org.opensearch.dataprepper.feedback.Observer;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
 import org.opensearch.dataprepper.model.types.ByteCount;
 import org.opensearch.dataprepper.parser.ByteCountDeserializer;
