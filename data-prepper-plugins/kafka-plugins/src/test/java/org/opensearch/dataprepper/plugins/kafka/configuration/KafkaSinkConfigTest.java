@@ -9,16 +9,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -33,7 +30,7 @@ class KafkaSinkConfigTest {
     @BeforeEach
     void setUp() {
         kafkaSinkConfig = new KafkaSinkConfig();
-        kafkaSinkConfig.setBootStrapServers(Arrays.asList("127.0.0.1:9093"));
+        kafkaSinkConfig.setBootStrapServers("127.0.0.1:9093");
         kafkaSinkConfig.setAuthConfig(mock(AuthConfig.class));
         kafkaSinkConfig.setTopic(mock(TopicConfig.class));
         kafkaSinkConfig.setSchemaConfig((mock(SchemaConfig.class)));
@@ -50,13 +47,8 @@ class KafkaSinkConfigTest {
     @Test
     void test_bootStrapServers_not_null() {
         assertThat(kafkaSinkConfig.getBootStrapServers(), notNullValue());
-        List<String> servers = kafkaSinkConfig.getBootStrapServers();
-        bootstrapServers = servers.stream().
-                flatMap(str -> Arrays.stream(str.split(","))).
-                map(String::trim).
-                collect(Collectors.toList());
-        assertThat(bootstrapServers.size(), equalTo(1));
-        assertThat(bootstrapServers, hasItem("127.0.0.1:9093"));
+        String servers = kafkaSinkConfig.getBootStrapServers();
+        assertThat(servers, equalTo("127.0.0.1:9093"));
     }
 
     @Test

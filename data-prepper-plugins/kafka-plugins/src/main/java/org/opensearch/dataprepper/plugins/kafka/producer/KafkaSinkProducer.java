@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.concurrent.Future;
 
 
 /**
@@ -108,6 +109,15 @@ public class KafkaSinkProducer<T> {
 
     }
 
+    public Future produceByteRecord(final Record<byte[]> record) {
+        try {
+            return send(topicName, kafkaSinkConfig.getPartitionKey(), record.getData());
+        } catch (final Exception e) {
+            LOG.error("Error occured while publishing byte record " + e.getMessage());
+            throw e;
+        }
+    }
+
     private Event getEvent(final Record<Event> record) {
         Event event = record.getData();
         try {
@@ -132,8 +142,8 @@ public class KafkaSinkProducer<T> {
         send(topicName, key, genericRecord);
     }
 
-    private void send(final String topicName, final String key, final Object record) {
-        producer.send(new ProducerRecord(topicName, key, record), callBack(record));
+    private Future send(final String topicName, final String key, final Object record) {
+        return producer.send(new ProducerRecord(topicName, key, record), callBack(record));
     }
 
     private void publishJsonMessage(final Record<Event> record, final String key) throws IOException, ProcessingException {

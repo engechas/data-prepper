@@ -15,10 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class JsonCodecTest {
-    private final HttpData goodTestData = HttpData.ofUtf8("[{\"a\":\"b\"}, {\"c\":\"d\"}]");
-    private final HttpData badTestDataJsonLine = HttpData.ofUtf8("{\"a\":\"b\"}");
-    private final HttpData badTestDataMultiJsonLines = HttpData.ofUtf8("{\"a\":\"b\"}{\"c\":\"d\"}");
-    private final HttpData badTestDataNonJson = HttpData.ofUtf8("non json content");
+    private final byte[] goodTestData = HttpData.ofUtf8("[{\"a\":\"b\"}, {\"c\":\"d\"}]").array();
+    private final byte[] badTestDataJsonLine = HttpData.ofUtf8("{\"a\":\"b\"}").array();
+    private final byte[] badTestDataMultiJsonLines = HttpData.ofUtf8("{\"a\":\"b\"}{\"c\":\"d\"}").array();
+    private final byte[] badTestDataNonJson = HttpData.ofUtf8("non json content").array();
     private final JsonCodec objectUnderTest = new JsonCodec();
 
     @Test

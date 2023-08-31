@@ -34,6 +34,7 @@ import org.opensearch.dataprepper.plugins.kafka.configuration.TopicConfig;
 import org.opensearch.dataprepper.plugins.kafka.util.KafkaTopicMetrics;
 import org.opensearch.dataprepper.plugins.kafka.util.LogRateLimiter;
 import org.opensearch.dataprepper.plugins.kafka.util.MessageFormat;
+import org.opensearch.dataprepper.plugins.source.loghttp.codec.JsonCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.glue.model.AccessDeniedException;
@@ -52,6 +53,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCause;
 
@@ -74,6 +76,7 @@ public class KafkaSourceCustomConsumer implements Runnable, ConsumerRebalanceLis
     private final BufferAccumulator<Record<Event>> bufferAccumulator;
     private final Buffer<Record<Event>> buffer;
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonCodec jsonCodec = new JsonCodec();
     private final JsonFactory jsonFactory = new JsonFactory();
     private Map<TopicPartition, OffsetAndMetadata> offsetsToCommit;
     private Map<TopicPartition, Long> ownedPartitionsEpoch;
@@ -337,7 +340,7 @@ public class KafkaSourceCustomConsumer implements Runnable, ConsumerRebalanceLis
         }
     }
 
-    private <T> Record<Event> getRecord(ConsumerRecord<String, T> consumerRecord, int partition) {
+    private <T> Collection<Record<Event>> getRecords(ConsumerRecord<String, T> consumerRecord, int partition) {
         Map<String, Object> data = new HashMap<>();
         Event event;
         Object value = consumerRecord.value();
@@ -345,6 +348,7 @@ public class KafkaSourceCustomConsumer implements Runnable, ConsumerRebalanceLis
         KafkaKeyMode kafkaKeyMode = topicConfig.getKafkaKeyMode();
         boolean plainTextMode = false;
         try {
+            LOG.error("SCHEMA TYPE: {}", schema);
             if (value instanceof JsonDataWithSchema) {
                 JsonDataWithSchema j = (JsonDataWithSchema)consumerRecord.value();
                 value = objectMapper.readValue(j.getPayload(), Map.class);
@@ -356,6 +360,13 @@ public class KafkaSourceCustomConsumer implements Runnable, ConsumerRebalanceLis
                 plainTextMode = true;
             } else if (schema == MessageFormat.JSON) {
                 value = objectMapper.convertValue(value, Map.class);
+            } else if (schema == MessageFormat.BYTES) {
+                final byte[] httpRequest = objectMapper.convertValue(value, byte[].class);
+                final List<String> jsonList = jsonCodec.parse(httpRequest);
+                final String actualKey = Objects.isNull(key) ? DEFAULT_KEY : key;
+                return jsonList.stream()
+                        .map(jsonString -> buildRecordLog(jsonString, actualKey, kafkaKeyMode, partition))
+                        .collect(Collectors.toList());
             }
         } catch (Exception e){
             LOG.error("Failed to parse JSON or AVRO record", e);
@@ -385,7 +396,24 @@ public class KafkaSourceCustomConsumer implements Runnable, ConsumerRebalanceLis
         eventMetadata.setAttribute("kafka_topic", topicName);
         eventMetadata.setAttribute("kafka_partition", String.valueOf(partition));
 
-        return new Record<Event>(event);
+        return List.of(new Record<Event>(event));
+    }
+
+    private Record<Event> buildRecordLog(final Object data, final String key, final KafkaKeyMode kafkaKeyMode, final int partition) {
+
+        final JacksonLog log = JacksonLog.builder()
+                .withData(data)
+                .getThis()
+                .build();
+
+        EventMetadata eventMetadata = log.getMetadata();
+        if (kafkaKeyMode == KafkaKeyMode.INCLUDE_AS_METADATA) {
+            eventMetadata.setAttribute("kafka_key", key);
+        }
+        eventMetadata.setAttribute("kafka_topic", topicName);
+        eventMetadata.setAttribute("kafka_partition", String.valueOf(partition));
+
+        return new Record<>(log);
     }
 
     private <T> void iterateRecordPartitions(ConsumerRecords<String, T> records, final AcknowledgementSet acknowledgementSet,
@@ -401,22 +429,24 @@ public class KafkaSourceCustomConsumer implements Runnable, ConsumerRebalanceLis
 
             List<ConsumerRecord<String, T>> partitionRecords = records.records(topicPartition);
             for (ConsumerRecord<String, T> consumerRecord : partitionRecords) {
-                Record<Event> record = getRecord(consumerRecord, topicPartition.partition());
-                if (record != null) {
-                    // Always add record to acknowledgementSet before adding to
-                    // buffer because another thread may take and process
-                    // buffer contents before the event record is added
-                    // to acknowledgement set
-                    if (acknowledgementSet != null) {
-                        acknowledgementSet.add(record.getData());
-                    }
-                    while (true) {
-                        try {
-                            bufferAccumulator.add(record);
-                            break;
-                        } catch (SizeOverflowException e) {
-                            topicMetrics.getNumberOfBufferSizeOverflows().increment();
-                            Thread.sleep(100);
+                Collection<Record<Event>> eventRecords = getRecords(consumerRecord, topicPartition.partition());
+                for (Record<Event> record: eventRecords) {
+                    if (record != null) {
+                        // Always add record to acknowledgementSet before adding to
+                        // buffer because another thread may take and process
+                        // buffer contents before the event record is added
+                        // to acknowledgement set
+                        if (acknowledgementSet != null) {
+                            acknowledgementSet.add(record.getData());
+                        }
+                        while (true) {
+                            try {
+                                bufferAccumulator.add(record);
+                                break;
+                            } catch (SizeOverflowException e) {
+                                topicMetrics.getNumberOfBufferSizeOverflows().increment();
+                                Thread.sleep(100);
+                            }
                         }
                     }
                 }

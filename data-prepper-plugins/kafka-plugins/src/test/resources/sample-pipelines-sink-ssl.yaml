@@ -3,8 +3,7 @@ log-pipeline :
     random:
   sink :
       kafka:
-        bootstrap_servers:
-          - "http://localhost:9092"
+        bootstrap_servers: "http://localhost:9092"
         thread_wait_time: 1000
         dlq:
           s3:

@@ -7,7 +7,6 @@ package org.opensearch.dataprepper.plugins.source.loghttp.codec;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linecorp.armeria.common.HttpData;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -25,9 +24,9 @@ public class JsonCodec implements Codec<List<String>> {
             new TypeReference<List<Map<String, Object>>>() {};
 
     @Override
-    public List<String> parse(HttpData httpData) throws IOException {
+    public List<String> parse(byte[] bytes) throws IOException {
         List<String> jsonList = new ArrayList<>();
-        final List<Map<String, Object>> logList = mapper.readValue(httpData.toInputStream(),
+        final List<Map<String, Object>> logList = mapper.readValue(bytes,
                 LIST_OF_MAP_TYPE_REFERENCE);
         for (final Map<String, Object> log: logList) {
             final String recordString = mapper.writeValueAsString(log);

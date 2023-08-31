@@ -133,6 +133,5 @@ class KafkaSourceTest {
         kafkaSource = createObjectUnderTest();
         assertTrue(Objects.nonNull(kafkaSource));
         kafkaSource.start(buffer);
-        assertTrue(Objects.nonNull(kafkaSource.getConsumer()));
     }
 }

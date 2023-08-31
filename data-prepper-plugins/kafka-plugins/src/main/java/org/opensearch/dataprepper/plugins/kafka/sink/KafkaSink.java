@@ -5,7 +5,6 @@
 
 package org.opensearch.dataprepper.plugins.kafka.sink;
 
-import org.apache.kafka.clients.producer.KafkaProducer;
 import org.opensearch.dataprepper.expression.ExpressionEvaluator;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
@@ -18,20 +17,13 @@ import org.opensearch.dataprepper.model.sink.AbstractSink;
 import org.opensearch.dataprepper.model.sink.Sink;
 import org.opensearch.dataprepper.model.sink.SinkContext;
 import org.opensearch.dataprepper.plugins.kafka.configuration.KafkaSinkConfig;
-import org.opensearch.dataprepper.plugins.kafka.configuration.SchemaConfig;
-import org.opensearch.dataprepper.plugins.kafka.configuration.TopicConfig;
 import org.opensearch.dataprepper.plugins.kafka.producer.KafkaSinkProducer;
+import org.opensearch.dataprepper.plugins.kafka.producer.KafkaSinkProducerFactory;
 import org.opensearch.dataprepper.plugins.kafka.producer.ProducerWorker;
-import org.opensearch.dataprepper.plugins.kafka.service.SchemaService;
-import org.opensearch.dataprepper.plugins.kafka.service.TopicService;
-import org.opensearch.dataprepper.plugins.kafka.util.RestUtils;
-import org.opensearch.dataprepper.plugins.kafka.util.SinkPropertyConfigurer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
-import java.util.Objects;
-import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -67,6 +59,8 @@ public class KafkaSink extends AbstractSink<Record<Event>> {
 
     private final SinkContext sinkContext;
 
+    private final KafkaSinkProducerFactory kafkaSinkProducerFactory;
+
 
     @DataPrepperPluginConstructor
     public KafkaSink(final PluginSetting pluginSetting, final KafkaSinkConfig kafkaSinkConfig, final PluginFactory pluginFactory,
@@ -78,7 +72,7 @@ public class KafkaSink extends AbstractSink<Record<Event>> {
         this.expressionEvaluator = expressionEvaluator;
         reentrantLock = new ReentrantLock();
         this.sinkContext = sinkContext;
-
+        this.kafkaSinkProducerFactory = new KafkaSinkProducerFactory();
 
     }
 
@@ -110,8 +104,8 @@ public class KafkaSink extends AbstractSink<Record<Event>> {
             return;
         }
         try {
-            prepareTopicAndSchema();
-            final KafkaSinkProducer producer = createProducer();
+            final KafkaSinkProducer producer = kafkaSinkProducerFactory.createProducer(kafkaSinkConfig, pluginFactory, pluginSetting,
+                    expressionEvaluator, sinkContext);
             records.forEach(record -> {
                 producerWorker = new ProducerWorker(producer, record);
                 executorService.submit(producerWorker);
@@ -122,42 +116,6 @@ public class KafkaSink extends AbstractSink<Record<Event>> {
             throw new RuntimeException(e.getMessage());
         }
         reentrantLock.unlock();
-    }
-
-    private void prepareTopicAndSchema() {
-        checkTopicCreationCriteriaAndCreateTopic();
-        final SchemaConfig schemaConfig = kafkaSinkConfig.getSchemaConfig();
-        if (schemaConfig != null) {
-            if (schemaConfig.isCreate()) {
-                final RestUtils restUtils = new RestUtils(schemaConfig);
-                final String topic = kafkaSinkConfig.getTopic().getName();
-                final SchemaService schemaService = new SchemaService.SchemaServiceBuilder()
-                        .getRegisterationAndCompatibilityService(topic, kafkaSinkConfig.getSerdeFormat(),
-                                restUtils, schemaConfig).build();
-                schemaService.registerSchema(topic);
-            }
-
-        }
-
-    }
-
-    private void checkTopicCreationCriteriaAndCreateTopic() {
-        final TopicConfig topic = kafkaSinkConfig.getTopic();
-        if (topic.isCreate()) {
-            final TopicService topicService = new TopicService(kafkaSinkConfig);
-            topicService.createTopic(kafkaSinkConfig.getTopic().getName(), topic.getNumberOfPartions(), topic.getReplicationFactor());
-            topicService.closeAdminClient();
-        }
-
-
-    }
-
-    public KafkaSinkProducer createProducer() {
-        Properties properties = SinkPropertyConfigurer.getProducerProperties(kafkaSinkConfig);
-        properties = Objects.requireNonNull(properties);
-        return new KafkaSinkProducer(new KafkaProducer<>(properties),
-                kafkaSinkConfig, new DLQSink(pluginFactory, kafkaSinkConfig, pluginSetting),
-                expressionEvaluator, Objects.nonNull(sinkContext) ? sinkContext.getTagsTargetKey() : null);
     }
 
 

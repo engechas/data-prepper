@@ -419,7 +419,6 @@ public class KafkaSourceJsonTypeIT {
             Thread.sleep(1000);
         }
         kafkaSource.start(buffer);
-        assertThat(kafkaSource.getConsumer().groupMetadata().groupId(), equalTo(testGroup));
         produceJsonRecords(bootstrapServers, topicName, numRecords);
         int numRetries = 0;
         while (numRetries++ < 10 && (receivedRecords.size() != numRecords)) {

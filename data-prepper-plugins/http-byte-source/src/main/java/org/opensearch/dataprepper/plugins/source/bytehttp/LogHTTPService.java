@@ -3,13 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package org.opensearch.dataprepper.plugins.source.loghttp;
+package org.opensearch.dataprepper.plugins.source.bytehttp;
 
 import com.linecorp.armeria.server.ServiceRequestContext;
 import org.opensearch.dataprepper.metrics.PluginMetrics;
 import org.opensearch.dataprepper.model.buffer.Buffer;
-import org.opensearch.dataprepper.model.log.JacksonLog;
-import org.opensearch.dataprepper.model.log.Log;
 import org.opensearch.dataprepper.model.record.Record;
 import com.linecorp.armeria.common.AggregatedHttpRequest;
 import com.linecorp.armeria.common.HttpData;
@@ -24,9 +22,6 @@ import org.opensearch.dataprepper.plugins.source.loghttp.codec.JsonCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /*
 * A HTTP service for log ingestion to be executed by BlockingTaskExecutor.
@@ -42,7 +37,7 @@ public class LogHTTPService {
 
     // TODO: support other data-types as request body, e.g. json_lines, msgpack
     private final JsonCodec jsonCodec = new JsonCodec();
-    private final Buffer<Record<Log>> buffer;
+    private final Buffer<Record<byte[]>> buffer;
     private final int bufferWriteTimeoutInMillis;
     private final Counter requestsReceivedCounter;
     private final Counter successRequestsCounter;
@@ -50,7 +45,7 @@ public class LogHTTPService {
     private final Timer requestProcessDuration;
 
     public LogHTTPService(final int bufferWriteTimeoutInMillis,
-                          final Buffer<Record<Log>> buffer,
+                          final Buffer<Record<byte[]>> buffer,
                           final PluginMetrics pluginMetrics) {
         this.buffer = buffer;
         this.bufferWriteTimeoutInMillis = bufferWriteTimeoutInMillis;
@@ -74,35 +69,16 @@ public class LogHTTPService {
     }
 
     private HttpResponse processRequest(final AggregatedHttpRequest aggregatedHttpRequest) throws Exception {
-        List<String> jsonList;
         final HttpData content = aggregatedHttpRequest.content();
+        final Record<byte[]> record = new Record<>(content.array());
 
         try {
-            jsonList = jsonCodec.parse(content.array());
-        } catch (IOException e) {
-            LOG.error("Failed to write the request of size {} due to: {}", content.length(), e.getMessage());
-            throw new IOException("Bad request data format. Needs to be json array.", e.getCause());
-        }
-        final List<Record<Log>> records = jsonList.stream()
-                .map(this::buildRecordLog)
-                .collect(Collectors.toList());
-        try {
-            buffer.writeAll(records, bufferWriteTimeoutInMillis);
+            buffer.write(record, bufferWriteTimeoutInMillis);
         } catch (Exception e) {
             LOG.error("Failed to write the request of size {} due to: {}", content.length(), e.getMessage());
             throw e;
         }
         successRequestsCounter.increment();
         return HttpResponse.of(HttpStatus.OK);
-    }
-
-    private Record<Log> buildRecordLog(String json) {
-
-        final JacksonLog log = JacksonLog.builder()
-                .withData(json)
-                .getThis()
-                .build();
-
-        return new Record<>(log);
     }
 }

@@ -72,6 +72,10 @@ public class KafkaSourceConfig {
         return acknowledgementsEnabled;
     }
 
+    public void setAcknowledgementsEnabled(final boolean acknowledgementsEnabled) {
+        this.acknowledgementsEnabled = acknowledgementsEnabled;
+    }
+
     public List<TopicConfig> getTopics() {
         return topics;
     }
@@ -112,6 +116,10 @@ public class KafkaSourceConfig {
 
     public AwsConfig getAwsConfig() {
         return awsConfig;
+    }
+
+    public void setAwsConfig(final AwsConfig awsConfig) {
+        this.awsConfig = awsConfig;
     }
 
     public void setAuthConfig(AuthConfig authConfig) {

@@ -9,14 +9,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import org.apache.commons.lang3.ObjectUtils;
 import org.opensearch.dataprepper.model.configuration.PluginModel;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -26,12 +25,26 @@ import java.util.Optional;
 
 public class KafkaSinkConfig {
 
+    public class EncryptionConfig {
+        @JsonProperty("type")
+        private EncryptionType type = EncryptionType.SSL;
+
+        @JsonProperty("insecure")
+        private boolean insecure = false;
+
+        public EncryptionType getType() {
+            return type;
+        }
+
+        public boolean getInsecure() {
+            return insecure;
+        }
+    }
+
     public static final String DLQ = "dlq";
 
     @JsonProperty("bootstrap_servers")
-    @NotNull
-    @Size(min = 1, message = "Bootstrap servers can't be empty")
-    private List<String> bootStrapServers;
+    private String bootStrapServers;
 
     private PluginModel dlq;
 
@@ -72,11 +85,20 @@ public class KafkaSinkConfig {
     @JsonProperty("serde_format")
     private String serdeFormat;
 
+    @JsonProperty("encryption")
+    private KafkaSinkConfig.EncryptionConfig encryptionConfig;
+
+    @JsonProperty("acknowledgments")
+    private Boolean acknowledgementsEnabled = false;
 
     @JsonProperty("partition_key")
     @NotNull
     @NotEmpty
     private String partitionKey;
+
+    @JsonProperty("aws")
+    @Valid
+    private AwsConfig awsConfig;
 
     @JsonProperty("producer_properties")
     private KafkaProducerProperties kafkaProducerProperties;
@@ -91,7 +113,7 @@ public class KafkaSinkConfig {
     }
 
 
-    public List<String> getBootStrapServers() {
+    public String getBootStrapServers() {
         return bootStrapServers;
     }
 
@@ -106,7 +128,7 @@ public class KafkaSinkConfig {
         return threadWaitTime;
     }
 
-    public void setBootStrapServers(List<String> bootStrapServers) {
+    public void setBootStrapServers(String bootStrapServers) {
         this.bootStrapServers = bootStrapServers;
     }
 
@@ -136,5 +158,20 @@ public class KafkaSinkConfig {
 
     public String getPartitionKey() {
         return partitionKey;
+    }
+
+    public AwsConfig getAwsConfig() {
+        return awsConfig;
+    }
+
+    public KafkaSinkConfig.EncryptionConfig getEncryptionConfig() {
+        if (Objects.isNull(encryptionConfig)) {
+            return new KafkaSinkConfig.EncryptionConfig();
+        }
+        return encryptionConfig;
+    }
+
+    public boolean getAcknowledgments() {
+        return acknowledgementsEnabled;
     }
 }

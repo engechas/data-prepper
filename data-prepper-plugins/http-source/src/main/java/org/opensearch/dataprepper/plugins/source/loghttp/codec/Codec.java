@@ -5,8 +5,6 @@
 
 package org.opensearch.dataprepper.plugins.source.loghttp.codec;
 
-import com.linecorp.armeria.common.HttpData;
-
 import java.io.IOException;
 
 /**
@@ -17,8 +15,8 @@ public interface Codec<T> {
     /**
      * parse the request into custom type
      *
-     * @param httpData The content of the original HTTP request
+     * @param bytes The content of the original HTTP request
      * @return The target data type
      */
-    T parse(HttpData httpData) throws IOException;
+    T parse(byte[] bytes) throws IOException;
 }
