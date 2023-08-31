@@ -92,8 +92,6 @@ public class KafkaSinkConfig {
     private Boolean acknowledgementsEnabled = false;
 
     @JsonProperty("partition_key")
-    @NotNull
-    @NotEmpty
     private String partitionKey;
 
     @JsonProperty("aws")

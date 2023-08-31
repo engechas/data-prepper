@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Future;
 
 
@@ -143,6 +144,10 @@ public class KafkaSinkProducer<T> {
     }
 
     private Future send(final String topicName, final String key, final Object record) {
+        if (Objects.isNull(key)) {
+            return producer.send(new ProducerRecord(topicName, record), callBack(record));
+        }
+
         return producer.send(new ProducerRecord(topicName, key, record), callBack(record));
     }
 
