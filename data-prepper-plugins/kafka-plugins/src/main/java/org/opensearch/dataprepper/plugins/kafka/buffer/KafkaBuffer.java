@@ -12,11 +12,9 @@ import org.opensearch.dataprepper.model.annotations.DataPrepperPlugin;
 import org.opensearch.dataprepper.model.annotations.DataPrepperPluginConstructor;
 import org.opensearch.dataprepper.model.buffer.AbstractBuffer;
 import org.opensearch.dataprepper.model.buffer.Buffer;
-import org.opensearch.dataprepper.model.configuration.PipelineDescription;
 import org.opensearch.dataprepper.model.configuration.PluginSetting;
 import org.opensearch.dataprepper.model.plugin.PluginFactory;
 import org.opensearch.dataprepper.model.record.Record;
-import com.google.common.util.concurrent.AtomicDouble;
 import org.opensearch.dataprepper.plugins.buffer.blockingbuffer.BlockingBuffer;
 import org.opensearch.dataprepper.plugins.kafka.configuration.KafkaSinkConfig;
 import org.opensearch.dataprepper.plugins.kafka.configuration.KafkaSourceConfig;
@@ -38,8 +36,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @DataPrepperPlugin(name = "kafka_buffer", pluginType = Buffer.class, pluginConfigurationType = KafkaSinkConfig.class)
 public class KafkaBuffer<T extends Record<?>> extends AbstractBuffer<T> {
     private static final Logger LOG = LoggerFactory.getLogger(KafkaBuffer.class);
-    private static final String BUFFER_USAGE_METRIC = "bufferUsage";
-    private final AtomicDouble bufferUsage;
+    private static final int BUFFER_SIZE = 1000000;
+    private static final int BATCH_SIZE = 250000;
     private final AbstractBuffer innerBuffer;
     private final KafkaSinkProducer producer;
 
@@ -48,11 +46,9 @@ public class KafkaBuffer<T extends Record<?>> extends AbstractBuffer<T> {
 
     @DataPrepperPluginConstructor
     public KafkaBuffer(final PluginSetting pluginSetting, final KafkaSinkConfig kafkaSinkConfig, final PluginFactory pluginFactory,
-                       final AcknowledgementSetManager acknowledgementSetManager, final PipelineDescription pipelineDescription,
-                       final PluginMetrics pluginMetrics) {
+                       final AcknowledgementSetManager acknowledgementSetManager, final PluginMetrics pluginMetrics) {
         super(pluginSetting);
-        bufferUsage = pluginMetrics.gauge(BUFFER_USAGE_METRIC, new AtomicDouble());
-        this.innerBuffer = new BlockingBuffer<>(pluginSetting);
+        this.innerBuffer = new BlockingBuffer<>(BUFFER_SIZE, BATCH_SIZE, pluginSetting.getPipelineName());
 
         final KafkaSinkProducerFactory kafkaSinkProducerFactory = new KafkaSinkProducerFactory();
         this.producer = kafkaSinkProducerFactory.createProducer(kafkaSinkConfig, pluginFactory, pluginSetting, null, null);
@@ -85,18 +81,18 @@ public class KafkaBuffer<T extends Record<?>> extends AbstractBuffer<T> {
     }
 
     @Override
-    protected void postProcess(final Long recordsInBuffer) {
-
+    public void postProcess(final Long recordsInBuffer) {
+        innerBuffer.postProcess(recordsInBuffer);
     }
 
     @Override
     public void doCheckpoint(final CheckpointState checkpointState) {
-
+        innerBuffer.doCheckpoint(checkpointState);
     }
 
     @Override
     public boolean isEmpty() {
-        return getRecordsInFlight() == 0;
+        return innerBuffer.isEmpty();
     }
 
     private KafkaSourceConfig convertSinkConfigToSourceConfig(final KafkaSinkConfig kafkaSinkConfig) {
