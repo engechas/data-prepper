@@ -348,7 +348,6 @@ public class KafkaSourceCustomConsumer implements Runnable, ConsumerRebalanceLis
         KafkaKeyMode kafkaKeyMode = topicConfig.getKafkaKeyMode();
         boolean plainTextMode = false;
         try {
-            LOG.error("SCHEMA TYPE: {}", schema);
             if (value instanceof JsonDataWithSchema) {
                 JsonDataWithSchema j = (JsonDataWithSchema)consumerRecord.value();
                 value = objectMapper.readValue(j.getPayload(), Map.class);

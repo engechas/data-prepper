@@ -254,7 +254,6 @@ public class SinkPropertyConfigurer {
     }
 
     public static String getBootStrapServersForMsk(final AwsIamAuthConfig awsIamAuthConfig, final AwsConfig awsConfig, final Logger LOG) {
-        LOG.error("GOT here");
         if (awsIamAuthConfig == AwsIamAuthConfig.ROLE) {
             String sessionName = "data-prepper-kafka-session" + UUID.randomUUID();
             StsClient stsClient = StsClient.builder()

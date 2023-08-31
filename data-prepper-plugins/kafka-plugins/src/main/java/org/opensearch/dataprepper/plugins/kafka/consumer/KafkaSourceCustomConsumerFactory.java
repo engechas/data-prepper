@@ -151,12 +151,9 @@ public class KafkaSourceCustomConsumerFactory {
     private void setSchemaRegistryProperties(final KafkaSourceConfig sourceConfig, final Properties properties, final TopicConfig topicConfig) {
         SchemaConfig schemaConfig = sourceConfig.getSchemaConfig();
         if (Objects.isNull(schemaConfig)) {
-            LOG.error("Should get here");
             setPropertiesForPlaintextAndJsonWithoutSchemaRegistry(properties, topicConfig);
             return;
         }
-
-        LOG.error("Shouldn't get here");
 
         if (schemaConfig.getType() == SchemaRegistryType.AWS_GLUE) {
             return;
