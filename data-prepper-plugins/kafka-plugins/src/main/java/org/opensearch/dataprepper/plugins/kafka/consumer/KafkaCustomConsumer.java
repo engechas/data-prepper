@@ -76,7 +76,7 @@ public class KafkaCustomConsumer implements Runnable, ConsumerRebalanceListener 
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private final JsonFactory jsonFactory = new JsonFactory();
     private Map<TopicPartition, OffsetAndMetadata> offsetsToCommit;
-    private Map<TopicPartition, Long> ownedPartitionsEpoch;
+    private static Map<TopicPartition, Long> ownedPartitionsEpoch;
     private Set<TopicPartition> partitionsToReset;
     private final AcknowledgementSetManager acknowledgementSetManager;
     private final Map<Integer, TopicPartitionCommitTracker> partitionCommitTrackerMap;
@@ -504,5 +504,39 @@ public class KafkaCustomConsumer implements Runnable, ConsumerRebalanceListener 
     final String getTopicPartitionOffset(final Map<TopicPartition, Long> offsetMap, final TopicPartition topicPartition) {
         final Long offset = offsetMap.get(topicPartition);
         return Objects.isNull(offset) ? "-" : offset.toString();
+    }
+
+    public boolean arePartitionsProcessed() {
+        final Collection<TopicPartition> partitions = ownedPartitionsEpoch.keySet();
+
+        try {
+            synchronized(this) {
+                final Map<TopicPartition, OffsetAndMetadata> committedOffsets = consumer.committed(new HashSet<>(partitions));
+                final Map<TopicPartition, Long> beginningOffsets = consumer.beginningOffsets(partitions);
+                final Map<TopicPartition, Long> endOffsets = consumer.endOffsets(partitions);
+                for (TopicPartition topicPartition : partitions) {
+                    final OffsetAndMetadata offsetAndMetadata = committedOffsets.get(topicPartition);
+                    final Long endOffset = endOffsets.get(topicPartition);
+
+                    // If there is data in the partition
+                    if (endOffset != 0L) {
+                        // If there is no committed offset for the partition
+                        if (Objects.isNull(offsetAndMetadata)) {
+                            return false;
+                        }
+
+                        // If the committed offset is behind the end offset
+                        if (offsetAndMetadata.offset() < endOffset) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOG.error("Failed to get offsets in onPartitionsAssigned callback", e);
+            return false;
+        }
+
+        return true;
     }
 }

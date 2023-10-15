@@ -43,6 +43,7 @@ public class KafkaBuffer<T extends Record<?>> extends AbstractBuffer<T> {
     private final ExecutorService executorService;
     private final Duration drainTimeout;
     private AtomicBoolean shutdownInProgress;
+    private List<KafkaCustomConsumer> emptyCheckingConsumers;
 
     @DataPrepperPluginConstructor
     public KafkaBuffer(final PluginSetting pluginSetting, final KafkaBufferConfig kafkaBufferConfig, final PluginFactory pluginFactory,
@@ -57,6 +58,8 @@ public class KafkaBuffer<T extends Record<?>> extends AbstractBuffer<T> {
         this.shutdownInProgress = new AtomicBoolean(false);
         final List<KafkaCustomConsumer> consumers = kafkaCustomConsumerFactory.createConsumersForTopic(kafkaBufferConfig, kafkaBufferConfig.getTopic(),
             innerBuffer, pluginMetrics, acknowledgementSetManager, shutdownInProgress);
+        this.emptyCheckingConsumers = kafkaCustomConsumerFactory.createConsumersForTopic(kafkaBufferConfig, kafkaBufferConfig.getTopic(),
+                innerBuffer, pluginMetrics, acknowledgementSetManager, shutdownInProgress);
         this.executorService = Executors.newFixedThreadPool(consumers.size());
         consumers.forEach(this.executorService::submit);
 
@@ -97,8 +100,9 @@ public class KafkaBuffer<T extends Record<?>> extends AbstractBuffer<T> {
 
     @Override
     public boolean isEmpty() {
-        // TODO: check Kafka topic is empty as well.
-        return innerBuffer.isEmpty();
+        final boolean arePartitionsProcessed = emptyCheckingConsumers.stream().allMatch(KafkaCustomConsumer::arePartitionsProcessed);
+
+        return arePartitionsProcessed && innerBuffer.isEmpty();
     }
 
     @Override
